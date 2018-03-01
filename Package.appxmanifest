@@ -45,5 +45,17 @@
 
   <Capabilities>
     <Capability Name="internetClient" />
+    <Capability Name="privateNetworkClientServer" />
+    <DeviceCapability Name="humaninterfacedevice">
+      <!-- Yocto-Temperature -->
+      <Device Id="vidpid:24e0 000b">
+        <Function Type="usage:ff00 0001" />
+      </Device>
+      <!-- Yocto-Light -->
+      <Device Id="vidpid:24e0 0019">
+        <Function Type="usage:ff00 0001" />
+      </Device>
+    </DeviceCapability>
+
   </Capabilities>
 </Package>
