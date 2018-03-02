@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices.WindowsRuntime;
+using System.Threading.Tasks;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
 using Windows.UI.Popups;
@@ -24,21 +26,20 @@ namespace DemoApp
     /// </summary>
     public sealed partial class MainPage : Page
     {
-     
-
         public MainPage()
         {
             this.InitializeComponent();
         }
 
-        private DispatcherTimer dispatcherTimer;
+        private NonReentrantDispatcherTimer timer;
         private int hardwaredetect = 0;
         private YSensor sensor;
 
 
-
         private async void OnLoad(object sender, RoutedEventArgs e)
         {
+            HwIdTextBox.Text = "No sensor detected";
+            TempTextBox.Text = "N/A";
             try {
                 await YAPI.RegisterHub("usb");
             } catch (YAPI_Exception ex) {
@@ -47,21 +48,19 @@ namespace DemoApp
                 return;
             }
 
-            HwIdTextBox.Text = "No sensor detected";
-            TempTextBox.Text = "N/A";
-
-            dispatcherTimer = new DispatcherTimer();
-            dispatcherTimer.Tick += dispatcherTimer_Tick;
-            dispatcherTimer.Interval = new TimeSpan(0, 0, 1);
-            dispatcherTimer.Start();
+            timer = new NonReentrantDispatcherTimer();
+            timer.Interval = new TimeSpan(0, 0, 0, 0, 100);
+            timer.TickTask = async () => { await dispatcherTimer_Tick(); };
+            timer.Start();
         }
 
-        async void dispatcherTimer_Tick(object sender, object e)
+        async Task dispatcherTimer_Tick()
         {
             try {
                 if (hardwaredetect == 0) {
                     await YAPI.UpdateDeviceList();
                 }
+
                 hardwaredetect = (hardwaredetect + 1) % 20;
                 await YAPI.HandleEvents();
                 if (sensor == null)
@@ -76,5 +75,31 @@ namespace DemoApp
                 sensor = null;
             }
         }
+    }
+
+
+    public class NonReentrantDispatcherTimer : DispatcherTimer
+    {
+        private bool IsRunning;
+
+        public NonReentrantDispatcherTimer()
+        {
+            base.Tick += SmartDispatcherTimer_Tick;
+        }
+
+        async void SmartDispatcherTimer_Tick(object sender, object e)
+        {
+            if (TickTask == null || IsRunning) {
+                return;
+            }
+
+            try {
+                IsRunning = true;
+                await TickTask.Invoke();
+            } finally {
+                IsRunning = false;
+            }
+        }
+        public Func<Task> TickTask { get; set; }
     }
 }
